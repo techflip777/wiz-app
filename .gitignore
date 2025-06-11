@@ -4,7 +4,6 @@
 *.dll
 *.so
 *.dylib
-*.env
 
 # Test binary, built with `go test -c`
 *.test
@@ -13,10 +12,31 @@
 *.out
 
 # Dependency directories (remove the comment below to include it)
-vendor/
+# vendor/
 
+# Environment variables
+.env
 
-.idea
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Terraform specific files
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
+
+# Logs
+*.log
+
 setup_test.sh
 Makefile
 deploy
