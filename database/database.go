@@ -15,8 +15,16 @@ import (
 var Client *mongo.Client = CreateMongoClient()
 
 func CreateMongoClient() *mongo.Client {
-	godotenv.Overload()
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Error loading .env file: %v", err)
+	}
+
 	MongoDbURI := os.Getenv("MONGODB_URI")
+	if MongoDbURI == "" {
+		log.Fatal("MONGODB_URI environment variable is not set")
+	}
+
 	client, err := mongo.NewClient(options.Client().ApplyURI(MongoDbURI))
 	if err != nil {
 		log.Fatal(err)
@@ -33,5 +41,5 @@ func CreateMongoClient() *mongo.Client {
 }
 
 func OpenCollection(client *mongo.Client, collectionName string) *mongo.Collection {
-	return client.Database("go-mongodb").Collection(collectionName)
+	return client.Database("todoapp").Collection(collectionName)
 }
