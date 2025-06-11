@@ -33,6 +33,7 @@ Thumbs.db
 *.tfstate.backup
 *.tfvars
 .terraform.lock.hcl
+terraform/.terraform/providers/
 
 # Logs
 *.log
