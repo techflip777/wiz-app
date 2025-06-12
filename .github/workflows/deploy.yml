@@ -137,7 +137,18 @@ jobs:
 
     - name: Wait for deployment to complete
       run: |
-        kubectl rollout status deployment/${{ env.CONTAINER_APP_NAME }} -n wiz-app
+        echo "Waiting for deployment to complete..."
+        if ! kubectl rollout status deployment/${{ env.CONTAINER_APP_NAME }} -n wiz-app --timeout=900s; then
+          echo "Deployment failed. Checking pod status..."
+          kubectl get pods -n wiz-app
+          echo "Checking pod logs..."
+          kubectl logs -n wiz-app -l app=${{ env.CONTAINER_APP_NAME }}
+          echo "Checking pod events..."
+          kubectl get events -n wiz-app --sort-by='.lastTimestamp'
+          echo "Checking deployment details..."
+          kubectl describe deployment ${{ env.CONTAINER_APP_NAME }} -n wiz-app
+          exit 1
+        fi
 
     - name: Get service URL
       run: |
