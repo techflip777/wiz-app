@@ -1,0 +1,114 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allows manual triggering
+
+env:
+  ACR_NAME: wizacr
+  AKS_CLUSTER_NAME: wiz-aks-cluster
+  RESOURCE_GROUP: wiz-exercise-rg
+  CONTAINER_APP_NAME: wiz-app
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Azure login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Login to Azure Container Registry
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ env.ACR_NAME }}.azurecr.io
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Build and push container image
+      run: |
+        docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }} .
+        docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
+
+    - name: Get AKS credentials
+      run: |
+        az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name ${{ env.AKS_CLUSTER_NAME }}
+
+    - name: Create Kubernetes namespace if not exists
+      run: |
+        kubectl create namespace wiz-app --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Create MongoDB connection string secret
+      run: |
+        kubectl create secret generic mongodb-connection \
+          --namespace wiz-app \
+          --from-literal=connection-string="${{ secrets.MONGODB_CONNECTION_STRING }}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy to AKS
+      run: |
+        # Update the deployment with the new image
+        cat <<EOF | kubectl apply -f -
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: ${{ env.CONTAINER_APP_NAME }}
+          namespace: wiz-app
+        spec:
+          replicas: 2
+          selector:
+            matchLabels:
+              app: ${{ env.CONTAINER_APP_NAME }}
+          template:
+            metadata:
+              labels:
+                app: ${{ env.CONTAINER_APP_NAME }}
+            spec:
+              containers:
+              - name: ${{ env.CONTAINER_APP_NAME }}
+                image: ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
+                ports:
+                - containerPort: 3000
+                env:
+                - name: MONGODB_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongodb-connection
+                      key: connection-string
+                resources:
+                  requests:
+                    cpu: "100m"
+                    memory: "128Mi"
+                  limits:
+                    cpu: "500m"
+                    memory: "512Mi"
+        ---
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: ${{ env.CONTAINER_APP_NAME }}
+          namespace: wiz-app
+        spec:
+          type: LoadBalancer
+          ports:
+          - port: 80
+            targetPort: 3000
+          selector:
+            app: ${{ env.CONTAINER_APP_NAME }}
+        EOF
+
+    - name: Wait for deployment to complete
+      run: |
+        kubectl rollout status deployment/${{ env.CONTAINER_APP_NAME }} -n wiz-app
+
+    - name: Get service URL
+      run: |
+        echo "Waiting for LoadBalancer IP..."
+        sleep 30
+        SERVICE_IP=$(kubectl get service ${{ env.CONTAINER_APP_NAME }} -n wiz-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        echo "Application is available at: http://$SERVICE_IP" 
