@@ -6,7 +6,6 @@ on:
   workflow_dispatch:  # Allows manual triggering
 
 env:
-  ACR_NAME: wizacr
   AKS_CLUSTER_NAME: wiz-aks-cluster
   RESOURCE_GROUP: wiz-exercise-rg
   CONTAINER_APP_NAME: wiz-app
@@ -23,12 +22,29 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+    - name: Get ACR Name and Credentials
+      id: get-acr
+      run: |
+        # Get ACR name
+        ACR_NAME=$(az acr list --resource-group ${{ env.RESOURCE_GROUP }} --query "[0].name" -o tsv)
+        echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
+        echo "Found ACR: $ACR_NAME"
+        
+        # Get ACR credentials
+        ACR_CREDS=$(az acr credential show --name $ACR_NAME)
+        ACR_USERNAME=$(echo $ACR_CREDS | jq -r '.username')
+        ACR_PASSWORD=$(echo $ACR_CREDS | jq -r '.passwords[0].value')
+        
+        # Set credentials as environment variables
+        echo "ACR_USERNAME=$ACR_USERNAME" >> $GITHUB_ENV
+        echo "ACR_PASSWORD=$ACR_PASSWORD" >> $GITHUB_ENV
+
     - name: Login to Azure Container Registry
       uses: azure/docker-login@v1
       with:
         login-server: ${{ env.ACR_NAME }}.azurecr.io
-        username: ${{ secrets.ACR_USERNAME }}
-        password: ${{ secrets.ACR_PASSWORD }}
+        username: ${{ env.ACR_USERNAME }}
+        password: ${{ env.ACR_PASSWORD }}
 
     - name: Build and push container image
       run: |
