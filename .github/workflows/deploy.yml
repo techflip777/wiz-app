@@ -32,8 +32,13 @@ jobs:
 
     - name: Build and push container image
       run: |
-        docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }} .
+        # Build the image with both latest and commit SHA tags
+        docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }} \
+                    -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:latest .
+        
+        # Push both tags
         docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
+        docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:latest
 
     - name: Get AKS credentials
       run: |
@@ -87,6 +92,18 @@ jobs:
                   limits:
                     cpu: "500m"
                     memory: "512Mi"
+                readinessProbe:
+                  httpGet:
+                    path: /health
+                    port: 3000
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                livenessProbe:
+                  httpGet:
+                    path: /health
+                    port: 3000
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
         ---
         apiVersion: v1
         kind: Service
