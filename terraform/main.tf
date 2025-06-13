@@ -12,6 +12,14 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -55,9 +63,11 @@ module "storage" {
 module "aks" {
   source = "./modules/aks"
 
-  resource_group_name = azurerm_resource_group.wiz_exercise.name
-  location           = azurerm_resource_group.wiz_exercise.location
-  subnet_id          = module.network.kubernetes_subnet_id
+  resource_group_name         = azurerm_resource_group.wiz_exercise.name
+  location                   = azurerm_resource_group.wiz_exercise.location
+  subnet_id                  = module.network.kubernetes_subnet_id
+  acr_id                     = module.acr.acr_id
+  mongodb_connection_string  = module.mongodb.connection_string
 }
 
 # Container Registry
@@ -66,4 +76,12 @@ module "acr" {
 
   resource_group_name = azurerm_resource_group.wiz_exercise.name
   location           = azurerm_resource_group.wiz_exercise.location
+}
+
+# Grant AKS cluster access to ACR (using kubelet identity for image pulls)
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  principal_id                     = module.aks.kubelet_identity_principal_id
+  role_definition_name            = "AcrPull"
+  scope                           = module.acr.acr_id
+  skip_service_principal_aad_check = true
 } 

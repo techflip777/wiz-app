@@ -138,6 +138,10 @@ output "vm_public_ip" {
   value = azurerm_public_ip.mongodb_pip.ip_address
 }
 
+output "vm_private_ip" {
+  value = azurerm_network_interface.mongodb_nic.private_ip_address
+}
+
 output "admin_username" {
   value = var.admin_username
 }
@@ -145,6 +149,12 @@ output "admin_username" {
 output "admin_password" {
   value     = var.admin_password
   sensitive = true
+}
+
+output "connection_string" {
+  value     = "mongodb://${var.admin_username}:${var.admin_password}@${azurerm_network_interface.mongodb_nic.private_ip_address}:27017/todoapp?authSource=admin"
+  sensitive = true
+  description = "MongoDB connection string for the application using private IP"
 }
 
 resource "azurerm_network_security_rule" "mongodb_ssh" {
@@ -173,4 +183,4 @@ resource "azurerm_network_security_rule" "mongodb_port" {
   destination_address_prefix = "*"
   resource_group_name        = var.resource_group_name
   network_security_group_name = azurerm_network_security_group.mongodb_nsg.name
-} 
+}

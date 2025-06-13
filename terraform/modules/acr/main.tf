@@ -26,4 +26,8 @@ output "acr_admin_username" {
 output "acr_admin_password" {
   value     = azurerm_container_registry.wiz_acr.admin_password
   sensitive = true
+}
+
+output "acr_id" {
+  value = azurerm_container_registry.wiz_acr.id
 } 
