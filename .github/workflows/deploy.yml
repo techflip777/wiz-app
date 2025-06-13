@@ -74,25 +74,25 @@ jobs:
     - name: Deploy to AKS
       run: |
         # Update the deployment with the new image
-        cat <<EOF | kubectl apply -f -
+        kubectl apply -f - <<EOF
         apiVersion: apps/v1
         kind: Deployment
         metadata:
-          name: ${{ env.CONTAINER_APP_NAME }}
+          name: wiz-app
           namespace: wiz-app
         spec:
           replicas: 2
           selector:
             matchLabels:
-              app: ${{ env.CONTAINER_APP_NAME }}
+              app: wiz-app
           template:
             metadata:
               labels:
-                app: ${{ env.CONTAINER_APP_NAME }}
+                app: wiz-app
             spec:
               containers:
-              - name: ${{ env.CONTAINER_APP_NAME }}
-                image: ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
+              - name: wiz-app
+                image: $ACR_LOGIN_SERVER/wiz-app:c9d51f112de9bdf87babd6ba005b197a19720f60
                 ports:
                 - containerPort: 8081
                 env:
@@ -101,28 +101,33 @@ jobs:
                     secretKeyRef:
                       name: mongodb-connection
                       key: connection-string
+                - name: SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: SECRET_KEY
                 resources:
                   requests:
-                    cpu: "100m"
                     memory: "128Mi"
+                    cpu: "100m"
                   limits:
-                    cpu: "500m"
                     memory: "512Mi"
-                readinessProbe:
-                  httpGet:
-                    path: /health
-                    port: 8081
-                  initialDelaySeconds: 30
-                  periodSeconds: 20
-                  timeoutSeconds: 5
-                  failureThreshold: 3
+                    cpu: "500m"
                 livenessProbe:
                   httpGet:
                     path: /health
                     port: 8081
                   initialDelaySeconds: 60
-                  periodSeconds: 30
                   timeoutSeconds: 5
+                  periodSeconds: 30
+                  failureThreshold: 3
+                readinessProbe:
+                  httpGet:
+                    path: /health
+                    port: 8081
+                  initialDelaySeconds: 30
+                  timeoutSeconds: 5
+                  periodSeconds: 20
                   failureThreshold: 3
         ---
         apiVersion: v1
@@ -159,4 +164,4 @@ jobs:
         echo "Waiting for LoadBalancer IP..."
         sleep 60
         SERVICE_IP=$(kubectl get service ${{ env.CONTAINER_APP_NAME }} -n wiz-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-        echo "Application is available at: http://$SERVICE_IP" 
+        echo "Application is available at: http://$SERVICE_IP"
