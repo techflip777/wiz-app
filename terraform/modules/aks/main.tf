@@ -197,3 +197,8 @@ resource "kubernetes_secret" "mongodb_connection" {
     null_resource.namespace_check
   ]
 }
+
+variable "acr_name" {
+  type    = string
+  default = "wizexerciseacrhyiathfo_1"
+}
