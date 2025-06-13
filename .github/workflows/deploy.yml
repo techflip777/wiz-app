@@ -92,7 +92,7 @@ jobs:
             spec:
               containers:
               - name: wiz-app
-                image: $ACR_LOGIN_SERVER/wiz-app:c9d51f112de9bdf87babd6ba005b197a19720f60
+                image: wizexerciseacrhyiathfo.azurecr.io/wiz-app:latest
                 ports:
                 - containerPort: 8081
                 env:
@@ -133,7 +133,7 @@ jobs:
         apiVersion: v1
         kind: Service
         metadata:
-          name: ${{ env.CONTAINER_APP_NAME }}
+          name: wiz-app
           namespace: wiz-app
         spec:
           type: LoadBalancer
@@ -141,7 +141,7 @@ jobs:
           - port: 80
             targetPort: 8081
           selector:
-            app: ${{ env.CONTAINER_APP_NAME }}
+            app: wiz-app
         EOF
 
     - name: Wait for deployment to complete
