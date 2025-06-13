@@ -6,16 +6,9 @@ variable "location" {
   type = string
 }
 
-# Random string for unique ACR name
-resource "random_string" "suffix" {
-  length  = 8
-  special = false
-  upper   = false
-}
-
 # Azure Container Registry
 resource "azurerm_container_registry" "wiz_acr" {
-  name                = "wizexerciseacr${random_string.suffix.result}"
+  name                = "wizexerciseacrhyiathfo"
   resource_group_name = var.resource_group_name
   location            = var.location
   sku                 = "Basic"
