@@ -107,11 +107,11 @@ resource "azurerm_linux_virtual_machine" "mongodb_vm" {
 
   provisioner "remote-exec" {
     inline = [
-      # Update and install MongoDB
+      # Update and install MongoDB 4.4
       "sudo apt-get update -y",
       "sudo apt-get install -y gnupg curl",
-      "curl -fsSL https://pgp.mongodb.com/server-6.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-6.0.gpg --dearmor",
-      "echo \"deb [ signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/6.0 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list",
+      "curl -fsSL https://pgp.mongodb.com/server-4.4.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-4.4.gpg --dearmor",
+      "echo \"deb [ signed-by=/usr/share/keyrings/mongodb-server-4.4.gpg ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.4 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.4.list",
       "sudo apt-get update -y",
       "sudo apt-get install -y mongodb-org",
       # Enable and start MongoDB
@@ -124,10 +124,10 @@ resource "azurerm_linux_virtual_machine" "mongodb_vm" {
   }
 }
 
-# Assign overly permissive role to VM (Contributor)
-resource "azurerm_role_assignment" "vm_contributor" {
+# Assign overly permissive role to VM (Owner - MAXIMUM security risk for testing)
+resource "azurerm_role_assignment" "vm_owner" {
   scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
-  role_definition_name = "Contributor"
+  role_definition_name = "Owner"
   principal_id         = azurerm_linux_virtual_machine.mongodb_vm.identity[0].principal_id
 }
 

@@ -90,11 +90,21 @@ jobs:
             spec:
               containers:
               - name: wiz-app
-                image: wizexerciseacrhyiathfo.azurecr.io/wiz-app:latest
+                image: wizexerciseacrhyiathfooo.azurecr.io/wiz-app:latest
                 ports:
                 - containerPort: 8081
                 env:
-                - name: MONGODB_URI
+                - name: MONGODB_URI                # 1. Get VM details including OS information
+                az vm show --resource-group wiz-exercise-rg --name mongodb-vm --query "storageProfile.imageReference" -o table
+                
+                # 2. Get more detailed OS information
+                az vm show --resource-group wiz-exercise-rg --name mongodb-vm --query "storageProfile.imageReference" -o json
+                
+                # 3. Get VM size and general info
+                az vm show --resource-group wiz-exercise-rg --name mongodb-vm --query "{Name:name, Size:hardwareProfile.vmSize, Location:location, OSType:storageProfile.osDisk.osType}" -o table
+                
+                # 4. Get exact image version details
+                az vm show --resource-group wiz-exercise-rg --name mongodb-vm --query "storageProfile.imageReference.{Publisher:publisher, Offer:offer, SKU:sku, Version:version}" -o table
                   valueFrom:
                     secretKeyRef:
                       name: mongodb-connection

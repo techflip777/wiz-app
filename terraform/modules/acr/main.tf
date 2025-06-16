@@ -8,7 +8,7 @@ variable "location" {
 
 # Azure Container Registry
 resource "azurerm_container_registry" "wiz_acr" {
-  name                = "wizexerciseacrhyiathfo"
+  name                = "wizexerciseacrhyiathfooo"
   resource_group_name = var.resource_group_name
   location            = var.location
   sku                 = "Basic"

@@ -200,5 +200,5 @@ resource "kubernetes_secret" "mongodb_connection" {
 
 variable "acr_name" {
   type    = string
-  default = "wizexerciseacrhyiathfo_1"
+  default = "wizexerciseacrhyiathfooo"
 }
