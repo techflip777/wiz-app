@@ -49,6 +49,7 @@ module "mongodb" {
   location           = azurerm_resource_group.wiz_exercise.location
   subnet_id          = module.network.database_subnet_id
   admin_username     = var.admin_username
+  backup_storage_account_name = module.storage.backup_storage_account_name
 }
 
 # Storage Account

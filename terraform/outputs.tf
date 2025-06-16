@@ -32,4 +32,32 @@ output "acr_login_server" {
 output "acr_admin_username" {
   description = "ACR admin username"
   value       = module.acr.acr_admin_username
-} 
+}
+
+# Backup Storage Outputs (SECURITY RISK - PUBLIC ACCESS)
+output "backup_storage_account_name" {
+  description = "Name of the backup storage account (PUBLICLY ACCESSIBLE)"
+  value       = module.storage.backup_storage_account_name
+}
+
+output "backup_container_url" {
+  description = "Public URL of the backup container - CRITICAL SECURITY RISK"
+  value       = module.storage.backup_container_url
+}
+
+output "backup_security_warning" {
+  description = "Security warning about public backup access"
+  value       = module.storage.security_warning
+}
+
+output "mongodb_backup_info" {
+  description = "Information about MongoDB backup configuration"
+  value = {
+    storage_account = module.storage.backup_storage_account_name
+    container_name  = module.storage.backup_container_name
+    public_url      = module.storage.backup_container_url
+    schedule        = "Daily at 2:00 AM UTC"
+    retention       = "30 days"
+    security_risk   = "CRITICAL - Publicly accessible backups"
+  }
+}

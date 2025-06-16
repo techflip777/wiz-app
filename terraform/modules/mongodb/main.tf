@@ -21,6 +21,11 @@ variable "admin_password" {
   sensitive = true
 }
 
+variable "backup_storage_account_name" {
+  type        = string
+  description = "Name of the backup storage account"
+}
+
 # Network Security Group with overly permissive SSH access
 resource "azurerm_network_security_group" "mongodb_nsg" {
   name                = "mongodb-nsg"
@@ -119,8 +124,155 @@ resource "azurerm_linux_virtual_machine" "mongodb_vm" {
       "sudo systemctl start mongod",
       # Allow remote connections
       "sudo sed -i 's/bindIp: 127.0.0.1/bindIp: 0.0.0.0/' /etc/mongod.conf",
-      "sudo systemctl restart mongod"
+      "sudo systemctl restart mongod",
+      
+      # Install Azure CLI for backup uploads
+      "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash",
+      
+      # Verify Azure CLI installation
+      "az --version",
+      
+      # Create scripts directory
+      "mkdir -p /home/azureuser/scripts",
+      
+      # Set environment variables
+      "echo 'export AZURE_STORAGE_ACCOUNT=${var.backup_storage_account_name}' >> /home/azureuser/.bashrc",
+      "echo 'export AZURE_STORAGE_ACCOUNT=${var.backup_storage_account_name}' >> /home/azureuser/.profile",
+      
+      # Login to Azure using managed identity
+      "az login --identity",
+      
+      # Verify Azure login
+      "az account show",
+      
+      # Create backup directory and set permissions
+      "sudo mkdir -p /tmp/mongodb_backups",
+      "sudo chown azureuser:azureuser /tmp/mongodb_backups",
+      
+      # Create log directory
+      "sudo mkdir -p /var/log",
+      "sudo touch /var/log/mongodb_backup.log",
+      "sudo chown azureuser:azureuser /var/log/mongodb_backup.log"
     ]
+  }
+  
+  # Setup MongoDB authentication and create backup scripts
+  provisioner "remote-exec" {
+    inline = [
+      "sudo systemctl stop mongod",
+      "sudo sed -i 's/#security:/security:\\n  authorization: enabled/' /etc/mongod.conf",
+      "sudo systemctl start mongod",
+      "sleep 5",
+      "mongo --eval \"db.getSiblingDB('admin').createUser({user: 'azureuser', pwd: 'Azure_123456', roles: [{role: 'root', db: 'admin'}]})\"",
+      "mongo -u azureuser -p Azure_123456 --authenticationDatabase admin --eval \"db.getSiblingDB('todoapp').todos.insertOne({title: 'Test todo', completed: false, createdAt: new Date()})\"",
+      "cat > /home/azureuser/scripts/mongodb_backup.sh << 'EOF'",
+      "#!/bin/bash",
+      "# MongoDB Backup Script with Azure Storage Upload",
+      "# WARNING: This script uploads to a PUBLICLY ACCESSIBLE blob container",
+      "# This is intentionally insecure for security testing purposes",
+      "BACKUP_DIR=\"/tmp/mongodb_backups\"",
+      "LOG_FILE=\"/var/log/mongodb_backup.log\"",
+      "RETENTION_DAYS=30",
+      "MONGODB_HOST=\"localhost\"",
+      "MONGODB_PORT=\"27017\"",
+      "MONGODB_DATABASE=\"todoapp\"",
+      "MONGODB_USER=\"azureuser\"",
+      "MONGODB_PASS=\"Azure_123456\"",
+      "STORAGE_ACCOUNT_NAME=\"${var.backup_storage_account_name}\"",
+      "CONTAINER_NAME=\"mongodb-backups\"",
+      "mkdir -p $BACKUP_DIR",
+      "log_message() {",
+      "    echo \"$(date '+%Y-%m-%d %H:%M:%S') - $1\" | tee -a $LOG_FILE",
+      "}",
+      "TIMESTAMP=$(date '+%Y-%m-%d-%H%M%S')",
+      "BACKUP_NAME=\"mongodb-backup-$TIMESTAMP\"",
+      "BACKUP_PATH=\"$BACKUP_DIR/$BACKUP_NAME\"",
+      "log_message \"Starting MongoDB backup process\"",
+      "log_message \"Backup name: $BACKUP_NAME\"",
+      "log_message \"Storage Account: $STORAGE_ACCOUNT_NAME (PUBLIC CONTAINER!)\"",
+      "log_message \"Creating MongoDB dump...\"",
+      "mongodump --host $MONGODB_HOST:$MONGODB_PORT --db $MONGODB_DATABASE --username $MONGODB_USER --password $MONGODB_PASS --authenticationDatabase admin --out $BACKUP_PATH",
+      "if [ $? -eq 0 ]; then",
+      "    log_message \"MongoDB dump completed successfully\"",
+      "else",
+      "    log_message \"ERROR: MongoDB dump failed\"",
+      "    exit 1",
+      "fi",
+      "log_message \"Compressing backup...\"",
+      "cd $BACKUP_DIR",
+      "tar -czf \"$BACKUP_NAME.tar.gz\" \"$BACKUP_NAME\"",
+      "if [ $? -eq 0 ]; then",
+      "    log_message \"Backup compression completed\"",
+      "    rm -rf \"$BACKUP_NAME\"",
+      "else",
+      "    log_message \"ERROR: Backup compression failed\"",
+      "    exit 1",
+      "fi",
+      "log_message \"Uploading backup to Azure Storage (PUBLIC CONTAINER - SECURITY RISK!)\"",
+      "# Wait for role assignments to propagate (may take a few minutes)",
+      "log_message \"Waiting for Azure role assignments to propagate...\"",
+      "sleep 120",
+      "# Login using VM's managed identity with retry logic",
+      "for i in {1..5}; do",
+      "    if az login --identity --output none 2>/dev/null; then",
+      "        log_message \"Successfully authenticated with managed identity\"",
+      "        break",
+      "    else",
+      "        log_message \"Managed identity authentication attempt $i failed, waiting...\"",
+      "        sleep 30",
+      "    fi",
+      "done",
+      "# Upload to blob storage using managed identity",
+      "az storage blob upload --account-name $STORAGE_ACCOUNT_NAME --container-name $CONTAINER_NAME --name \"$BACKUP_NAME.tar.gz\" --file \"$BACKUP_DIR/$BACKUP_NAME.tar.gz\" --auth-mode login --output none",
+      "if [ $? -eq 0 ]; then",
+      "    log_message \"Backup uploaded successfully to public blob storage\"",
+      "    log_message \"WARNING: Backup is now publicly accessible at:\"",
+      "    log_message \"https://$STORAGE_ACCOUNT_NAME.blob.core.windows.net/$CONTAINER_NAME/$BACKUP_NAME.tar.gz\"",
+      "else",
+      "    log_message \"ERROR: Failed to upload backup to Azure Storage\"",
+      "    exit 1",
+      "fi",
+      "find $BACKUP_DIR -name \"*.tar.gz\" -mtime +$RETENTION_DAYS -delete",
+      "log_message \"SECURITY WARNING: This backup is stored in a publicly accessible container!\"",
+      "log_message \"Backup process completed successfully\"",
+      "exit 0",
+      "EOF",
+      "chmod +x /home/azureuser/scripts/mongodb_backup.sh"
+    ]
+  }
+  
+  # Setup cron job for automated backups
+  provisioner "remote-exec" {
+    inline = [
+      "cat > /home/azureuser/scripts/setup_backup_cron.sh << 'EOF'",
+      "#!/bin/bash",
+      "# Setup automated daily backups",
+      "echo \"Setting up automated MongoDB backup cron job...\"",
+      "(crontab -l 2>/dev/null; echo \"0 2 * * * /home/azureuser/scripts/mongodb_backup.sh >> /var/log/mongodb_backup_cron.log 2>&1\") | crontab -",
+      "echo \"Automated backup cron job setup completed\"",
+      "echo \"Backups will run daily at 2:00 AM UTC\"",
+      "echo \"Listing current cron jobs:\"",
+      "crontab -l",
+      "EOF",
+      "chmod +x /home/azureuser/scripts/setup_backup_cron.sh",
+      "/home/azureuser/scripts/setup_backup_cron.sh"
+    ]
+  }
+  
+  # Test the backup script
+  provisioner "remote-exec" {
+    inline = [
+      "echo \"VM setup completed, role assignments will be created separately...\"",
+      "echo \"Backup script is ready at /home/azureuser/scripts/mongodb_backup.sh\"",
+    ]
+    
+    # Connection details
+    connection {
+      type     = "ssh"
+      user     = var.admin_username
+      password = var.admin_password
+      host     = self.public_ip_address
+    }
   }
 }
 
@@ -129,6 +281,37 @@ resource "azurerm_role_assignment" "vm_owner" {
   scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
   role_definition_name = "Owner"
   principal_id         = azurerm_linux_virtual_machine.mongodb_vm.identity[0].principal_id
+}
+
+# Additional role assignment for backup storage access
+resource "azurerm_role_assignment" "vm_storage_contributor" {
+  scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_linux_virtual_machine.mongodb_vm.identity[0].principal_id
+}
+
+# Run backup test after role assignments are created
+resource "null_resource" "backup_test" {
+  provisioner "remote-exec" {
+    inline = [
+      "echo \"Running initial backup test after role assignments...\"",
+      "echo \"This may take a few minutes...\"",
+      "/home/azureuser/scripts/mongodb_backup.sh"
+    ]
+    
+    connection {
+      type     = "ssh"
+      user     = var.admin_username
+      password = var.admin_password
+      host     = azurerm_linux_virtual_machine.mongodb_vm.public_ip_address
+    }
+  }
+  
+  depends_on = [
+    azurerm_role_assignment.vm_owner,
+    azurerm_role_assignment.vm_storage_contributor,
+    azurerm_linux_virtual_machine.mongodb_vm
+  ]
 }
 
 # Get current subscription
