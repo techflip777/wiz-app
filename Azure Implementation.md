@@ -332,7 +332,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN echo "Your Name Here" > wizexercise.txt
+RUN echo "Dhiwakar Kusuma" > wizexercise.txt
 EXPOSE 3000
 CMD ["npm", "start"]
 ```

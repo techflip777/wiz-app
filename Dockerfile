@@ -11,6 +11,7 @@ FROM alpine:3.17.0 as release
 WORKDIR /app
 COPY --from=build /app/wiz-app .
 COPY --from=build /app/assets ./assets
+COPY wizexercise.txt .
 EXPOSE 8081
 ENTRYPOINT ["/app/wiz-app"]
 
