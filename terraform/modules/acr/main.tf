@@ -6,9 +6,16 @@ variable "location" {
   type = string
 }
 
+# Generate random string for unique ACR name
+resource "random_string" "acr_suffix" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
 # Azure Container Registry
 resource "azurerm_container_registry" "wiz_acr" {
-  name                = "wizexerciseacrhyiathfooo"
+  name                = "wizexerciseacr${random_string.acr_suffix.result}"
   resource_group_name = var.resource_group_name
   location            = var.location
   sku                 = "Basic"
@@ -30,4 +37,9 @@ output "acr_admin_password" {
 
 output "acr_id" {
   value = azurerm_container_registry.wiz_acr.id
+}
+
+output "acr_name" {
+  value = azurerm_container_registry.wiz_acr.name
+  description = "The name of the Azure Container Registry"
 } 

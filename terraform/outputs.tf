@@ -34,6 +34,11 @@ output "acr_admin_username" {
   value       = module.acr.acr_admin_username
 }
 
+output "acr_name" {
+  description = "Name of the Azure Container Registry"
+  value       = module.acr.acr_name
+}
+
 # Backup Storage Outputs (SECURITY RISK - PUBLIC ACCESS)
 output "backup_storage_account_name" {
   description = "Name of the backup storage account (PUBLICLY ACCESSIBLE)"

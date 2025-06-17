@@ -90,7 +90,7 @@ jobs:
             spec:
               containers:
               - name: wiz-app
-                image: wizexerciseacrhyiathfooo.azurecr.io/wiz-app:latest
+                image: ${{ env.ACR_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:latest
                 ports:
                 - containerPort: 8081
                 env:
