@@ -172,18 +172,17 @@
      ```
 - **Validation Commands**:
   ```bash
-  # Get the pod name
+  # Get the credentials
+  az aks get-credentials --resource-group wiz-exercise-rg --name wiz-aks-cluster
+
+  # List the pods
   kubectl get pods -n wiz-app
 
-  # Verify file exists in the container
-  kubectl exec -n wiz-app <pod-name> -- ls -l /app/wizexercise.txt
-
-  # Check file contents
+  # Get the pod name and check the file
   kubectl exec -n wiz-app <pod-name> -- cat /app/wizexercise.txt
 
-  # Alternative: Copy file from container to local machine
-  kubectl cp wiz-app/<pod-name>:/app/wizexercise.txt ./wizexercise.txt
-  cat wizexercise.txt
+  # with the above commands you should be able to see Dhiwakar Kusuma printed in the terminal
+
   ```
 
 #### <a name="k8s-admin"></a>Kubernetes Admin Role
